@@ -14,7 +14,7 @@ async function consume(limiter: RateLimiterMemory, key: string) {
   }
 }
 
-/** 当前部署为单进程。计数由库管理，IP 只使用 Express 的连接地址。 */
+/** 当前部署为单进程。计数由库管理，IP 使用 Express 按可信代理配置解析的地址。 */
 export function createAuthLimits() {
   const ip = new RateLimiterMemory({ points: 120, duration: 60 });
   const sends = new RateLimiterMemory({ points: 10, duration: 3600 });

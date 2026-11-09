@@ -1,0 +1,111 @@
+name: 构建和发布镜像
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: images-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: 类型、Lint、独立数据库测试
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: folinel_test
+          POSTGRES_PASSWORD: ci-only-password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d folinel_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      TEST_DATABASE_URL: postgresql://postgres:ci-only-password@127.0.0.1:5432/folinel_test
+      TEST_DATABASE_SSL: "false"
+      TEST_DATABASE_POOL_MAX: "5"
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+          package-manager-cache: false
+      - name: 安装固定版本 pnpm 和依赖
+        run: |
+          npm install --global pnpm@12.15.0
+          pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - run: pnpm lint
+      - run: pnpm test
+      - name: 检查 OpenAPI 与源码同步
+        run: |
+          pnpm api:generate
+          git diff --exit-code -- docs/api/openapi.json
+
+  images:
+    name: 构建 ${{ matrix.target }} 镜像
+    needs: check
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [api, web]
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: 生成小写镜像名称
+        id: image
+        env:
+          REPOSITORY: ${{ github.repository }}
+        run: echo "prefix=ghcr.io/${REPOSITORY,,}" >> "$GITHUB_OUTPUT"
+      - uses: docker/setup-qemu-action@v4
+      - uses: docker/setup-buildx-action@v4
+      - name: 登录 GHCR
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: 构建并发布
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          target: ${{ matrix.target }}
+          platforms: linux/amd64,linux/arm64
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.image.outputs.prefix }}-${{ matrix.target }}:sha-${{ github.sha }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+          cache-from: type=gha,scope=folinel-${{ matrix.target }}
+          cache-to: type=gha,mode=max,scope=folinel-${{ matrix.target }}
+      - name: 写入部署信息
+        if: github.event_name != 'pull_request'
+        env:
+          IMAGE_PREFIX: ${{ steps.image.outputs.prefix }}
+        run: |
+          echo '整个工作流成功后，将以下配置填入服务器 deploy/.env：' >> "$GITHUB_STEP_SUMMARY"
+          echo '```dotenv' >> "$GITHUB_STEP_SUMMARY"
+          echo "IMAGE_PREFIX=$IMAGE_PREFIX" >> "$GITHUB_STEP_SUMMARY"
+          echo "IMAGE_TAG=sha-$GITHUB_SHA" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"

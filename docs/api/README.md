@@ -21,7 +21,7 @@
 
 ## React / 浏览器
 
-- 使用同源 `/api/...`。Vite 已配置 `/api` 转发到 `http://localhost:3000`；生产反向代理保持前端与 API 同源。
+- 使用同源 `/api/...`。Vite 已配置 `/api` 转发到 `http://localhost:3000`；生产 Caddy 配置保持前端与 API 同源，见 [部署步骤](../06-deployment.md)。
 - JSON 请求使用 `credentials: 'include'`；浏览器自动处理 HttpOnly Cookie，无需把 token 放入 localStorage。可使用 Better Auth 官方 React 客户端登录、查询会话和退出；自定义注册三步直接调用项目路由。
 - `AUTH_TRUSTED_ORIGINS` 填实际页面来源（开发默认为 `http://localhost:5173`），多个来源用逗号分隔。来源信任不等于 CORS；当前采用同源代理。
 - HTTPS Cookie 使用 `Secure`、`HttpOnly`、`SameSite=Lax`。携带 Cookie 的 POST 需要可信 Origin，防止跨站请求。

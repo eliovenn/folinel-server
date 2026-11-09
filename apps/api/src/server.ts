@@ -43,9 +43,10 @@ const errorHandler: ErrorRequestHandler = (error, _req, res, _next) => {
   res.status(safe.status).json({ error: { code: safe.code, message: safe.message } });
 };
 
-export function createApp({ auth }: { auth?: AuthService } = {}) {
+export function createApp({ auth, trustProxy = [] }: { auth?: AuthService; trustProxy?: string[] } = {}) {
   const app = express();
   app.disable('x-powered-by');
+  app.set('trust proxy', trustProxy.length ? trustProxy : false);
   app.use(helmet());
   if (process.env.NODE_ENV === 'development') {
     // 不记录 URL/query，避免回调凭据或用户输入进入访问日志。

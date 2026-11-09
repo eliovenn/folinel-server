@@ -2,11 +2,24 @@ import assert from 'node:assert/strict';
 import { randomBytes } from 'node:crypto';
 import { describe, it } from 'node:test';
 
+import { readProxyConfig } from '#src/config/proxy.ts';
 import { readAuthConfig } from '#src/modules/auth/config.ts';
 import { createAuthLimits } from '#src/modules/auth/limits.ts';
 import { matchesBlockedDomain, registerSchema } from '#src/modules/auth/validation.ts';
 
 describe('注册配置与边界', () => {
+  it('代理默认不受信任，只接受明确的 IP 或网段，配置错误不回显输入', () => {
+    assert.deepEqual(readProxyConfig({}), []);
+    assert.deepEqual(readProxyConfig({ TRUST_PROXY: ' 172.30.20.2, ::1, 192.0.2.0/24 ' }), ['172.30.20.2', '::1', '192.0.2.0/24']);
+    for (const value of ['true', '1', '*', 'loopback', 'https://TOP_SECRET@example.com']) {
+      assert.throws(() => readProxyConfig({ TRUST_PROXY: value }), (error: unknown) => {
+        assert.ok(error instanceof Error);
+        assert.doesNotMatch(error.message, /TOP_SECRET/);
+        return true;
+      });
+    }
+  });
+
   it('域名按完整标签匹配，大小写归一化，不能误伤相似域名', () => {
     for (const domain of ['outlook.com', 'mail.outlook.com', 'MAIL.OUTLOOK.COM']) {
       assert.equal(matchesBlockedDomain(domain, 'outlook.com'), true);

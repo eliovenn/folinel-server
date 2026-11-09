@@ -8,6 +8,8 @@ Folinel 的后端 API 和 React 管理后台 workspace，面向单人开发和�
 
 使用 Node.js 24 和 pnpm。数据库配置见 [docs/01-database.md](docs/01-database.md)。
 
+Ubuntu 单机部署使用 GitHub Actions + GHCR + Docker Compose，包含 API、Caddy 管理后台和 PostgreSQL。首次配置、迁移与更新步骤见 [部署文档](docs/06-deployment.md)。
+
 ```bash
 pnpm db:check       # 只读验证 PostgreSQL 连接
 pnpm test:db        # 数据库配置测试

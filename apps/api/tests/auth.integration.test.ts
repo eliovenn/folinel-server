@@ -57,7 +57,7 @@ describe('邮箱注册与会话（独立 PostgreSQL）', {
     await database.close();
   });
 
-  function fixture(t: TestContext, authConfig = config) {
+  function fixture(t: TestContext, authConfig = config, trustProxy: string[] = []) {
     t.mock.timers.enable({ apis: ['Date'], now: Date.now() });
     const messages: EmailMessage[] = [];
     let failMail = false;
@@ -68,7 +68,7 @@ describe('邮箱注册与会话（独立 PostgreSQL）', {
         return Promise.resolve({ messageId: 'test-delivery' });
       },
     });
-    const app = createApp({ auth });
+    const app = createApp({ auth, trustProxy });
     const agent = supertest(app);
     const email = `registration-${randomUUID()}@example.test`;
     emails.push(email);
@@ -313,5 +313,46 @@ describe('邮箱注册与会话（独立 PostgreSQL）', {
     assert.equal(limited, true);
     const count = await database.db.execute(sql`select count(*)::int as count from "user" where email = ${f.email}`);
     assert.equal(count[0].count, 0);
+  });
+
+  it('可信代理后的访客分别限流，伪造的链首和内部 IP 头不能更换限流身份', async (t) => {
+    const f = fixture(t, config, ['127.0.0.1', '::1']);
+    for (let i = 0; i < 120; i++) {
+      const response = await f.agent.get('/api/auth/not-exposed')
+        .set('X-Forwarded-For', `192.0.2.${i}, 198.51.100.10`)
+        .set('x-folinel-client-ip', `192.0.2.${i}`);
+      assert.equal(response.status, 404);
+    }
+    const limited = await f.agent.get('/api/auth/not-exposed')
+      .set('X-Forwarded-For', '203.0.113.20, 198.51.100.10')
+      .set('x-folinel-client-ip', '203.0.113.20');
+    assert.equal(limited.status, 429);
+    assert.ok(Number(limited.headers['retry-after']) > 0);
+    assert.equal((await f.agent.get('/api/auth/not-exposed')
+      .set('X-Forwarded-For', '198.51.100.11')).status, 404);
+  });
+
+  it('配置代理后仍忽略非可信直连的转发头', async (t) => {
+    const f = fixture(t, config, ['192.0.2.1']);
+    for (let i = 0; i < 120; i++) {
+      assert.equal((await f.agent.get('/api/auth/not-exposed')
+        .set('X-Forwarded-For', `198.51.100.${i}`)).status, 404);
+    }
+    assert.equal((await f.agent.get('/api/auth/not-exposed')
+      .set('X-Forwarded-For', '203.0.113.1')).status, 429);
+  });
+
+  it('通过可信代理注册建会话时，保存解析后的真实访客 IP', async (t) => {
+    const f = fixture(t, config, ['127.0.0.1', '::1']);
+    const start = await f.register();
+    const finish = await f.agent.post('/api/v1/auth/verify-registration')
+      .set('X-Forwarded-For', '198.51.100.25')
+      .set('x-folinel-client-ip', '203.0.113.99')
+      .send({ email: f.email, registrationId: registrationId(start), otp: f.otp() });
+    assert.equal(finish.status, 200);
+    const { user: current } = authenticated(finish);
+    const sessions = await database.db.select().from(session).where(eq(session.userId, current.id));
+    assert.equal(sessions.length, 1);
+    assert.equal(sessions[0].ipAddress, '198.51.100.25');
   });
 });

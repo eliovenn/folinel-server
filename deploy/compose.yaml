@@ -1,0 +1,120 @@
+name: folinel
+
+x-logging: &logging
+  driver: local
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_DB: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_ADMIN_PASSWORD:?请填写 POSTGRES_ADMIN_PASSWORD}
+      APP_DB_PASSWORD: ${APP_DB_PASSWORD:?请填写 APP_DB_PASSWORD}
+    command:
+      - postgres
+      - -c
+      - max_connections=30
+      - -c
+      - shared_buffers=128MB
+      - -c
+      - log_statement=none
+      - -c
+      - log_min_error_statement=panic
+      - -c
+      - log_parameter_max_length_on_error=0
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./postgres-init.sql:/docker-entrypoint-initdb.d/01-folinel.sql:ro
+    networks:
+      - database
+    shm_size: 128mb
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U postgres -d postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    logging: *logging
+
+  api:
+    image: ${IMAGE_PREFIX:?请填写 IMAGE_PREFIX}-api:${IMAGE_TAG:?请填写 IMAGE_TAG}
+    restart: unless-stopped
+    init: true
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+      NODE_OPTIONS: --max-old-space-size=384
+      TRUST_PROXY: ${PROXY_IP:-172.30.20.2}
+      AUTH_SECRET: ${AUTH_SECRET:?请填写 AUTH_SECRET}
+      AUTH_BASE_URL: https://${SITE_DOMAIN:?请填写 SITE_DOMAIN}
+      AUTH_TRUSTED_ORIGINS: https://${SITE_DOMAIN:?请填写 SITE_DOMAIN}
+      DATABASE_URL: postgresql://folinel:${APP_DB_PASSWORD:?请填写 APP_DB_PASSWORD}@db:5432/folinel
+      DATABASE_SSL: "false"
+      DATABASE_POOL_MAX: "5"
+      SMTP_HOST: ${SMTP_HOST:-smtp.resend.com}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_SECURE: ${SMTP_SECURE:-false}
+      SMTP_USER: ${SMTP_USER:-resend}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:?请填写 SMTP_PASSWORD}
+      SMTP_FROM: ${SMTP_FROM:-noreply@whisprea.ink}
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - proxy
+      - database
+    stop_grace_period: 20s
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:3000/health', {signal: AbortSignal.timeout(3000)}).then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    logging: *logging
+
+  web:
+    image: ${IMAGE_PREFIX:?请填写 IMAGE_PREFIX}-web:${IMAGE_TAG:?请填写 IMAGE_TAG}
+    restart: unless-stopped
+    environment:
+      SITE_DOMAIN: ${SITE_DOMAIN:?请填写 SITE_DOMAIN}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      api:
+        condition: service_healthy
+    networks:
+      proxy:
+        ipv4_address: ${PROXY_IP:-172.30.20.2}
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    logging: *logging
+
+networks:
+  proxy:
+    ipam:
+      config:
+        - subnet: ${PROXY_SUBNET:-172.30.20.0/24}
+  database:
+    internal: true
+
+volumes:
+  postgres_data:
+  caddy_data:
+  caddy_config:

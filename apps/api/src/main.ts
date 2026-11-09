@@ -3,6 +3,7 @@ import logger from 'jet-logger';
 import type { Server } from 'node:http';
 
 import { Env } from './config/env.ts';
+import { ProxyConfigError, readProxyConfig } from './config/proxy.ts';
 import { createDatabase } from './db/client.ts';
 import { readDatabaseConfig } from './db/config.ts';
 import { databaseErrorMessage } from './db/errors.ts';
@@ -35,12 +36,13 @@ async function shutdown() {
 }
 
 try {
+  const trustProxy = readProxyConfig(process.env);
   const authConfig = readAuthConfig(process.env);
   mailer = createSmtpMailer(readSmtpConfig(process.env));
   database = createDatabase(readDatabaseConfig(process.env));
   // 验证成功后才开始接收请求；不自动创建表或执行迁移。
   await database.check();
-  const app = createApp({ auth: createAuthService(database.db, authConfig, mailer) });
+  const app = createApp({ auth: createAuthService(database.db, authConfig, mailer), trustProxy });
   app.locals.db = database.db;
 
   httpServer = app.listen(Env.PORT);
@@ -59,7 +61,7 @@ try {
     });
   }
 } catch (error: unknown) {
-  const message = error instanceof AuthConfigError || error instanceof SmtpConfigError ? error.message : databaseErrorMessage(error);
+  const message = error instanceof AuthConfigError || error instanceof SmtpConfigError || error instanceof ProxyConfigError ? error.message : databaseErrorMessage(error);
   logger.err(`API 启动失败：${message}`);
   await shutdown();
   process.exit(1);

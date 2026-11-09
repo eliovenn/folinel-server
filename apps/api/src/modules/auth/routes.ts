@@ -34,9 +34,10 @@ export function authRequestBoundary(auth: AuthService): RequestHandler {
   const origins = new Set([auth.config.baseURL, ...auth.config.trustedOrigins]);
   return async (req, res, next) => {
     res.setHeader('Cache-Control', 'no-store');
-    // 默认不信任代理头。后续部署代理时需显式配置可信代理地址。
-    req.headers['x-folinel-client-ip'] = req.socket.remoteAddress ?? 'unknown';
-    await auth.limits.ip(req.socket.remoteAddress ?? 'unknown');
+    // Express 只解析显式信任的代理链；覆盖外部伪造的内部头，统一会话与限流身份。
+    const clientIP = req.ip ?? req.socket.remoteAddress ?? 'unknown';
+    req.headers['x-folinel-client-ip'] = clientIP;
+    await auth.limits.ip(clientIP);
     if (req.method !== 'GET' && req.method !== 'HEAD') {
       const origin = req.get('origin');
       if ((origin && !origins.has(origin)) || (!origin && (req.get('cookie') || req.get('sec-fetch-site')))) {

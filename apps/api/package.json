@@ -2,6 +2,7 @@
   "name": "@folinel/api",
   "version": "0.0.0",
   "type": "module",
+  "files": ["src", "drizzle"],
   "scripts": {
     "dev": "cross-env NODE_ENV=development PORT=3000 node --env-file-if-exists=config/.env.development --watch src/main.ts",
     "lint": "eslint .",

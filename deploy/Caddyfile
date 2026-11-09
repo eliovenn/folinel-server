@@ -1,0 +1,26 @@
+{$SITE_DOMAIN} {
+	encode zstd gzip
+
+	@api path /api /api/* /health
+	handle @api {
+		# 保留原始路径；Caddy 默认覆盖外部传入的 X-Forwarded-*。
+		reverse_proxy api:3000 {
+			header_up -X-Folinel-Client-IP
+		}
+	}
+
+	handle {
+		root * /srv
+		route {
+			try_files {path} /index.html
+			header /index.html Cache-Control "no-cache"
+			file_server
+		}
+	}
+}
+
+# 仅容器内部的进程健康检查，公网 /health 仍检查 API。
+http://127.0.0.1:8080 {
+	bind 127.0.0.1
+	respond /health "ok" 200
+}

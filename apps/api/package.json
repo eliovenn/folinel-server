@@ -1,0 +1,65 @@
+{
+  "name": "@folinel/api",
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "cross-env NODE_ENV=development PORT=3000 node --env-file-if-exists=config/.env.development --watch src/main.ts",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "start": "cross-env NODE_ENV=production node --env-file-if-exists=config/.env.production src/main.ts",
+    "test": "cross-env NODE_ENV=test PORT=4000 node --env-file-if-exists=config/.env.test --test --test-concurrency=1",
+    "typecheck": "tsc -b --noEmit",
+    "db:check": "cross-env NODE_ENV=development node --env-file-if-exists=config/.env.development src/db/check.ts",
+    "db:check:production": "cross-env NODE_ENV=production node --env-file-if-exists=config/.env.production src/db/check.ts",
+    "test:db": "cross-env NODE_ENV=test node --env-file-if-exists=config/.env.test --test tests/database.test.ts tests/database.integration.test.ts",
+    "test:email": "cross-env NODE_ENV=test node --test tests/email.test.ts",
+    "smtp:check": "cross-env NODE_ENV=development node --env-file-if-exists=config/.env.development src/email/check.ts",
+    "smtp:check:production": "cross-env NODE_ENV=production node --env-file-if-exists=config/.env.production src/email/check.ts",
+    "auth:schema": "auth generate --config auth.schema.ts --adapter drizzle --dialect postgresql --output src/db/auth-schema.ts --yes",
+    "api:generate": "node scripts/generate-openapi.ts",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "cross-env NODE_ENV=development node --env-file-if-exists=config/.env.development src/db/migrate.ts",
+    "db:migrate:production": "cross-env NODE_ENV=production node --env-file-if-exists=config/.env.production src/db/migrate.ts",
+    "db:migrate:test": "cross-env NODE_ENV=test node --env-file-if-exists=config/.env.test src/db/migrate.ts",
+    "test:auth": "cross-env NODE_ENV=test node --env-file-if-exists=config/.env.test --test --test-concurrency=1 tests/auth.test.ts tests/auth.integration.test.ts"
+  },
+  "imports": {
+    "#src/*": "./src/*"
+  },
+  "engines": {
+    "node": "^22.18.0 || ^24.0.0 || >=26.0.0"
+  },
+  "dependencies": {
+    "@better-auth/drizzle-adapter": "1.7.18",
+    "better-auth": "1.7.18",
+    "cross-env": "^10.1.0",
+    "drizzle-orm": "^0.45.4",
+    "express": "^5.3.0",
+    "helmet": "^8.3.0",
+    "jet-logger": "3.0.0",
+    "morgan": "^1.12.1",
+    "nodemailer": "^10.3.1",
+    "postgres": "^4.0.0",
+    "rate-limiter-flexible": "11.3.0",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@trivago/prettier-plugin-sort-imports": "^6.0.2",
+    "@types/express": "^5.0.6",
+    "@types/morgan": "^1.9.10",
+    "@types/node": "^24.19.2",
+    "@types/supertest": "^7.2.1",
+    "auth": "1.7.18",
+    "drizzle-kit": "0.31.11",
+    "eslint": "^10.12.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-n": "^18.4.1",
+    "jiti": "^2.7.0",
+    "prettier": "^3.9.10",
+    "supertest": "^7.3.1",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.71.1"
+  },
+  "private": true
+}

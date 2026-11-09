@@ -1,0 +1,33 @@
+{
+  "type": "module",
+  "name": "folinel-server",
+  "version": "0.0.0",
+  "packageManager": "pnpm@12.15.0",
+  "engines": {
+    "node": "^24.0.0"
+  },
+  "private": true,
+  "scripts": {
+    "dev": "pnpm --parallel --filter @folinel/api --filter @folinel/admin run dev",
+    "dev:api": "pnpm --filter @folinel/api dev",
+    "dev:admin": "pnpm --filter @folinel/admin dev",
+    "build": "pnpm typecheck && pnpm --filter @folinel/admin build",
+    "typecheck": "pnpm -r --if-present typecheck",
+    "lint": "pnpm -r --if-present lint",
+    "test": "pnpm --filter @folinel/api test",
+    "start:api": "pnpm --filter @folinel/api start",
+    "db:check": "pnpm --filter @folinel/api db:check",
+    "db:check:production": "pnpm --filter @folinel/api db:check:production",
+    "test:db": "pnpm --filter @folinel/api test:db",
+    "test:email": "pnpm --filter @folinel/api test:email",
+    "smtp:check": "pnpm --filter @folinel/api smtp:check",
+    "smtp:check:production": "pnpm --filter @folinel/api smtp:check:production",
+    "auth:schema": "pnpm --filter @folinel/api auth:schema",
+    "api:generate": "pnpm --filter @folinel/api api:generate",
+    "db:generate": "pnpm --filter @folinel/api db:generate",
+    "db:migrate": "pnpm --filter @folinel/api db:migrate",
+    "db:migrate:production": "pnpm --filter @folinel/api db:migrate:production",
+    "db:migrate:test": "pnpm --filter @folinel/api db:migrate:test",
+    "test:auth": "pnpm --filter @folinel/api test:auth"
+  }
+}
